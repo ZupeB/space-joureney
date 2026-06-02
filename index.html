@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaxy Explorer 🚀</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #020208;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            border: 2px solid #444cf7;
+            box-shadow: 0 0 30px rgba(68, 76, 247, 0.4);
+            background: radial-gradient(circle at center, #0a0a23 0%, #020208 100%);
+            border-radius: 8px;
+            cursor: none;
+        }
+        .ui {
+            position: absolute;
+            top: 30px;
+            font-size: 22px;
+            font-weight: bold;
+            font-family: monospace;
+            text-shadow: 0 0 8px #00ffff;
+            width: 760px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+        .instructions {
+            position: absolute;
+            bottom: 30px;
+            color: #666a8a;
+            font-size: 14px;
+            font-family: monospace;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <div id="score">DISTANCE: 0 LY</div>
+        <div id="speed">WARP FACTOR: 4.2</div>
+    </div>
+    
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    
+    <div class="instructions">MOVE MOUSE / TOUCH TO STEER • DODGE THE SPACE DEBRIS</div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let distance = 0;
+        let gameOver = false;
+
+        // Player Vessel
+        const player = {
+            x: 120,
+            y: 250,
+            targetY: 250,
+            smoothing: 0.15 
+        };
+
+        // Cosmic Starfield (Parallax Effect)
+        const stars = [];
+        for(let i=0; i<120; i++) {
+            stars.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2.5,
+                speed: Math.random() * 4 + 0.5
+            });
+        }
+
+        // Asteroids
+        const asteroids = [];
+        function spawnAsteroid() {
+            if (gameOver) return;
+            asteroids.push({
+                x: canvas.width + 50,
+                y: Math.random() * canvas.height,
+                radius: Math.random() * 18 + 8,
+                speed: Math.random() * 5 + 3,
+                rotation: 0,
+                rotSpeed: (Math.random() - 0.5) * 0.05
+            });
+            // Dynamic Spawning Speed
+            setTimeout(spawnAsteroid, Math.random() * 800 + 400);
+        }
+        spawnAsteroid();
+
+        // Track controls
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            player.targetY = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            player.targetY = e.touches[0].clientY - rect.top;
+            e.preventDefault();
+        }, { passive: false });
+
+        function drawSpacecraft(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // Engine Plasma Trail
+            let trailLength = Math.random() * 25 + 15;
+            let gradient = ctx.createLinearGradient(-10, 0, -trailLength, 0);
+            gradient.addColorStop(0, '#00ffff');
+            gradient.addColorStop(0.3, '#ff00aa');
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.moveTo(-10, -6);
+            ctx.lineTo(-trailLength, 0);
+            ctx.lineTo(-10, 6);
+            ctx.closePath();
+            ctx.fill();
+
+            // Main Hull
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(35, 0);
+            ctx.lineTo(-15, -14);
+            ctx.lineTo(-8, 0);
+            ctx.lineTo(-15, 14);
+            ctx.closePath();
+            ctx.fill();
+
+            // Cockpit Glow
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath();
+            ctx.ellipse(12, 0, 8, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // Loop
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. Render Galaxy Starfield
+            stars.forEach(star => {
+                if (!gameOver) star.x -= star.speed;
+                if (star.x < 0) star.x = canvas.width;
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.size / 2.5})`;
+                ctx.fillRect(star.x, star.y, star.size, star.size);
+            });
+
+            // 2. Track & Draw Ship
+            player.y += (player.targetY - player.y) * player.smoothing;
+            if (player.y < 25) player.y = 25;
+            if (player.y > canvas.height - 25) player.y = canvas.height - 25;
+            
+            drawSpacecraft(player.x, player.y);
+
+            // 3. Process Asteroids
+            asteroids.forEach((ast, idx) => {
+                if (!gameOver) {
+                    ast.x -= ast.speed;
+                    ast.rotation += ast.rotSpeed;
+                }
+
+                ctx.save();
+                ctx.translate(ast.x, ast.y);
+                ctx.rotate(ast.rotation);
+                
+                ctx.fillStyle = '#2d2d3d';
+                ctx.strokeStyle = '#565676';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, ast.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                // Hitbox detection
+                let dist = Math.hypot(player.x - ast.x, player.y - ast.y);
+                if (dist < ast.radius + 14) {
+                    gameOver = true;
+                }
+
+                if (ast.x < -60) asteroids.splice(idx, 1);
+            });
+
+            // 4. Score HUD
+            if (!gameOver) {
+                distance += 0.2;
+                document.getElementById('score').innerText = `DISTANCE: ${Math.floor(distance)} LY`;
+            } else {
+                ctx.fillStyle = 'rgba(2, 2, 8, 0.8)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = '#ff3366';
+                ctx.font = 'bold 36px monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('HULL INTEGRITY COMPROMISED', canvas.width / 2, canvas.height / 2 - 20);
+                
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '18px monospace';
+                ctx.fillText(`You navigated ${Math.floor(distance)} Light Years through the sector.`, canvas.width / 2, canvas.height / 2 + 30);
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText('CLICK ANYWHERE TO RE-LAUNCH', canvas.width / 2, canvas.height / 2 + 70);
+            }
+
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('click', () => {
+            if (gameOver) {
+                asteroids.length = 0;
+                distance = 0;
+                gameOver = false;
+                player.y = 250;
+                player.targetY = 250;
+                spawnAsteroid();
+            }
+        });
+
+        loop();
+    </script>
+</body>
+</html>
