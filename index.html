@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <!-- This meta tag is crucial for mobile: it prevents zooming and scales the page correctly -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Galaxy Explorer 🚀</title>
     <style>
@@ -11,8 +10,8 @@
             background-color: #020208;
             color: white;
             font-family: 'Segoe UI', sans-serif;
-            overflow: hidden; /* Prevents scrollbars */
-            touch-action: none; /* Prevents mobile browser actions like pull-to-refresh */
+            overflow: hidden;
+            touch-action: none;
         }
         #gameCanvas {
             display: block;
@@ -37,27 +36,43 @@
             pointer-events: none;
             z-index: 10;
         }
-        .instructions {
-            position: absolute;
-            bottom: 25px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            color: #666a8a;
-            font-size: 0.9rem;
-            font-family: monospace;
-            pointer-events: none;
-            z-index: 10;
-        }
         
-        /* Media query specifically for smaller mobile screens */
+        /* The new Start Screen overlay */
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(2, 2, 8, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            cursor: pointer;
+        }
+        #startScreen h1 {
+            color: #00ffff;
+            font-family: monospace;
+            text-shadow: 0 0 15px #00ffff;
+        }
+        #startScreen p {
+            color: #ccc;
+            font-family: monospace;
+        }
+
         @media (max-width: 600px) {
             .ui { font-size: 0.9rem; padding: 0 15px; }
-            .instructions { font-size: 0.75rem; bottom: 15px; }
         }
     </style>
 </head>
 <body>
+
+    <div id="startScreen">
+        <h1>GALAXY EXPLORER</h1>
+        <p>TAP OR CLICK TO LAUNCH</p>
+    </div>
 
     <div class="ui">
         <div id="score">DISTANCE: 0 LY</div>
@@ -65,34 +80,41 @@
     </div>
     
     <canvas id="gameCanvas"></canvas>
-    
-    <div class="instructions">DRAG FINGER TO STEER • DODGE DEBRIS</div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
 
-        // 1. Dynamic Canvas Resizing for Mobile
+        // --- ASSET LOADING ---
+        const asteroidImg = new Image();
+        asteroidImg.src = 'asteroid.png'; // Make sure this matches your uploaded file name!
+
+        const bgMusic = new Audio('soundtrack.mp3'); // Make sure this matches your uploaded file name!
+        bgMusic.loop = true;
+        bgMusic.volume = 0.5;
+
+        // Dynamic Resizing
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
         }
-        // Resize immediately and whenever the screen orientation changes
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
         let distance = 0;
         let gameOver = false;
+        let gameStarted = false;
 
-        // Player Vessel (Starts a bit off the left edge)
+        // Player Vessel
         const player = {
             x: Math.min(100, window.innerWidth * 0.15), 
             y: canvas.height / 2,
             targetY: canvas.height / 2,
-            smoothing: 0.25 // Slightly faster smoothing for responsive touch
+            smoothing: 0.25 
         };
 
-        // Cosmic Starfield
+        // Starfield
         const stars = [];
         for(let i=0; i<150; i++) {
             stars.push({
@@ -106,27 +128,28 @@
         // Asteroids
         const asteroids = [];
         function spawnAsteroid() {
-            if (gameOver) return;
+            if (gameOver || !gameStarted) return;
             asteroids.push({
                 x: canvas.width + 50,
                 y: Math.random() * canvas.height,
-                radius: Math.random() * 18 + 8,
+                radius: Math.random() * 25 + 15, // Made slightly bigger for the images
                 speed: Math.random() * 5 + 3,
                 rotation: 0,
                 rotSpeed: (Math.random() - 0.5) * 0.05
             });
             setTimeout(spawnAsteroid, Math.random() * 800 + 400);
         }
-        spawnAsteroid();
 
-        // 2. Mobile Touch and Desktop Mouse Controls
+        // Controls
         canvas.addEventListener('mousemove', (e) => {
-            player.targetY = e.clientY;
+            if (gameStarted && !gameOver) player.targetY = e.clientY;
         });
 
         canvas.addEventListener('touchmove', (e) => {
-            player.targetY = e.touches[0].clientY;
-            e.preventDefault(); // Prevents the screen from moving while dragging the ship
+            if (gameStarted && !gameOver) {
+                player.targetY = e.touches[0].clientY;
+                e.preventDefault();
+            }
         }, { passive: false });
 
         function drawSpacecraft(x, y) {
@@ -157,7 +180,7 @@
             ctx.closePath();
             ctx.fill();
 
-            // Cockpit Glow
+            // Cockpit
             ctx.fillStyle = '#00ffff';
             ctx.beginPath();
             ctx.ellipse(12, 0, 8, 3, 0, 0, Math.PI * 2);
@@ -168,27 +191,28 @@
 
         // Main Game Loop
         function loop() {
+            if (!gameStarted) return;
+
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Render Galaxy Starfield
+            // Stars
             stars.forEach(star => {
                 if (!gameOver) star.x -= star.speed;
                 if (star.x < 0) {
                     star.x = canvas.width;
-                    star.y = Math.random() * canvas.height; // Wrap around smoothly
+                    star.y = Math.random() * canvas.height;
                 }
                 ctx.fillStyle = `rgba(255, 255, 255, ${star.size / 2.5})`;
                 ctx.fillRect(star.x, star.y, star.size, star.size);
             });
 
-            // Track & Draw Ship
+            // Player
             player.y += (player.targetY - player.y) * player.smoothing;
             if (player.y < 25) player.y = 25;
             if (player.y > canvas.height - 25) player.y = canvas.height - 25;
-            
             drawSpacecraft(player.x, player.y);
 
-            // Process Asteroids
+            // Asteroids
             asteroids.forEach((ast, idx) => {
                 if (!gameOver) {
                     ast.x -= ast.speed;
@@ -199,25 +223,30 @@
                 ctx.translate(ast.x, ast.y);
                 ctx.rotate(ast.rotation);
                 
-                ctx.fillStyle = '#2d2d3d';
-                ctx.strokeStyle = '#565676';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(0, 0, ast.radius, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.stroke();
+                // --- NEW IMAGE DRAWING METHOD ---
+                // If the image is loaded, draw it. Otherwise, draw a backup circle.
+                if (asteroidImg.complete && asteroidImg.naturalWidth !== 0) {
+                    // Draw the image centered around x:0, y:0
+                    ctx.drawImage(asteroidImg, -ast.radius, -ast.radius, ast.radius * 2, ast.radius * 2);
+                } else {
+                    ctx.fillStyle = '#565676';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, ast.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 ctx.restore();
 
-                // Hitbox detection
+                // Collision Box
                 let dist = Math.hypot(player.x - ast.x, player.y - ast.y);
-                if (dist < ast.radius + 14) {
+                // We make the hitbox slightly smaller than the image so glancing blows don't kill you instantly
+                if (dist < ast.radius * 0.8 + 10) {
                     gameOver = true;
                 }
 
-                if (ast.x < -60) asteroids.splice(idx, 1);
+                if (ast.x < -100) asteroids.splice(idx, 1);
             });
 
-            // Score HUD & Game Over Screen
+            // UI Tracking
             if (!gameOver) {
                 distance += 0.2;
                 document.getElementById('score').innerText = `DISTANCE: ${Math.floor(distance)} LY`;
@@ -225,7 +254,6 @@
                 ctx.fillStyle = 'rgba(2, 2, 8, 0.8)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Scale game over text for smaller mobile screens
                 let isMobile = canvas.width < 600;
                 
                 ctx.fillStyle = '#ff3366';
@@ -235,7 +263,7 @@
                 
                 ctx.fillStyle = '#ffffff';
                 ctx.font = `${isMobile ? 14 : 18}px monospace`;
-                ctx.fillText(`Navigated ${Math.floor(distance)} Light Years`, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText(`Mapsd ${Math.floor(distance)} Light Years`, canvas.width / 2, canvas.height / 2 + 20);
                 
                 ctx.fillStyle = '#00ffff';
                 ctx.fillText('TAP ANYWHERE TO RE-LAUNCH', canvas.width / 2, canvas.height / 2 + 60);
@@ -244,7 +272,19 @@
             requestAnimationFrame(loop);
         }
 
-        // 3. Restart Handler (Works for both click and touch)
+        // Handle the initial start screen click
+        startScreen.addEventListener('click', () => {
+            startScreen.style.display = 'none'; // Hide the start screen
+            gameStarted = true;
+            
+            // Start the music!
+            bgMusic.play().catch(e => console.log("Audio play failed:", e));
+            
+            spawnAsteroid();
+            requestAnimationFrame(loop);
+        });
+
+        // Handle Restarting after game over
         const handleRestart = (e) => {
             if (gameOver) {
                 asteroids.length = 0;
@@ -256,10 +296,13 @@
             }
         };
 
-        window.addEventListener('click', handleRestart);
-        window.addEventListener('touchstart', handleRestart, { passive: false });
+        window.addEventListener('click', (e) => {
+            if (e.target !== startScreen) handleRestart();
+        });
+        window.addEventListener('touchstart', (e) => {
+            if (e.target !== startScreen) handleRestart();
+        }, { passive: false });
 
-        loop();
     </script>
 </body>
 </html>
