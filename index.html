@@ -37,7 +37,6 @@
             z-index: 10;
         }
         
-        /* The new Start Screen overlay */
         #startScreen {
             position: absolute;
             top: 0;
@@ -88,9 +87,9 @@
 
         // --- ASSET LOADING ---
         const asteroidImg = new Image();
-        asteroidImg.src = 'asteroid.png'; // Make sure this matches your uploaded file name!
+        asteroidImg.src = 'asteroid.png'; 
 
-        const bgMusic = new Audio('soundtrack.mp3'); // Make sure this matches your uploaded file name!
+        const bgMusic = new Audio('soundtrack.mp3'); 
         bgMusic.loop = true;
         bgMusic.volume = 0.5;
 
@@ -130,9 +129,9 @@
         function spawnAsteroid() {
             if (gameOver || !gameStarted) return;
             asteroids.push({
-                x: canvas.width + 50,
+                x: canvas.width + 150, // Spawning slightly further back to account for massive size
                 y: Math.random() * canvas.height,
-                radius: Math.random() * 25 + 15, // Made slightly bigger for the images
+                radius: (Math.random() * 25 + 15) * 3, // <-- HERE ARE THE 3X MASSIVE ASTEROIDS
                 speed: Math.random() * 5 + 3,
                 rotation: 0,
                 rotSpeed: (Math.random() - 0.5) * 0.05
@@ -223,10 +222,7 @@
                 ctx.translate(ast.x, ast.y);
                 ctx.rotate(ast.rotation);
                 
-                // --- NEW IMAGE DRAWING METHOD ---
-                // If the image is loaded, draw it. Otherwise, draw a backup circle.
                 if (asteroidImg.complete && asteroidImg.naturalWidth !== 0) {
-                    // Draw the image centered around x:0, y:0
                     ctx.drawImage(asteroidImg, -ast.radius, -ast.radius, ast.radius * 2, ast.radius * 2);
                 } else {
                     ctx.fillStyle = '#565676';
@@ -238,12 +234,11 @@
 
                 // Collision Box
                 let dist = Math.hypot(player.x - ast.x, player.y - ast.y);
-                // We make the hitbox slightly smaller than the image so glancing blows don't kill you instantly
                 if (dist < ast.radius * 0.8 + 10) {
                     gameOver = true;
                 }
 
-                if (ast.x < -100) asteroids.splice(idx, 1);
+                if (ast.x < -200) asteroids.splice(idx, 1);
             });
 
             // UI Tracking
@@ -272,19 +267,16 @@
             requestAnimationFrame(loop);
         }
 
-        // Handle the initial start screen click
         startScreen.addEventListener('click', () => {
-            startScreen.style.display = 'none'; // Hide the start screen
+            startScreen.style.display = 'none'; 
             gameStarted = true;
             
-            // Start the music!
             bgMusic.play().catch(e => console.log("Audio play failed:", e));
             
             spawnAsteroid();
             requestAnimationFrame(loop);
         });
 
-        // Handle Restarting after game over
         const handleRestart = (e) => {
             if (gameOver) {
                 asteroids.length = 0;
